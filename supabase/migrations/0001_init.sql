@@ -29,6 +29,18 @@ create table if not exists public.sessions (
   is_deleted boolean not null default false
 );
 
+create table if not exists public.exercises (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null,
+  muscle_group text not null,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  synced_at timestamptz,
+  is_deleted boolean not null default false
+);
+
 create table if not exists public.session_exercises (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
@@ -48,18 +60,6 @@ create table if not exists public.sets (
   set_number integer not null,
   reps integer not null,
   weight_kg numeric not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  synced_at timestamptz,
-  is_deleted boolean not null default false
-);
-
-create table if not exists public.exercises (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users (id) on delete cascade,
-  name text not null,
-  muscle_group text not null,
-  is_default boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   synced_at timestamptz,
@@ -143,3 +143,18 @@ end $$;
 insert into storage.buckets (id, name, public)
 values ('client-photos', 'client-photos', true)
 on conflict (id) do nothing;
+
+-- Base grants: SQL-created tables do not inherit project default privileges.
+grant select on all tables in schema public to anon;
+grant all on all tables in schema public to authenticated;
+grant all on all tables in schema public to service_role;
+
+-- Storage policies for the client-photos bucket.
+create policy "client_photos_public_read" on storage.objects
+  for select using (bucket_id = 'client-photos');
+create policy "client_photos_auth_insert" on storage.objects
+  for insert to authenticated with check (bucket_id = 'client-photos');
+create policy "client_photos_auth_update" on storage.objects
+  for update to authenticated using (bucket_id = 'client-photos');
+create policy "client_photos_auth_delete" on storage.objects
+  for delete to authenticated using (bucket_id = 'client-photos');
